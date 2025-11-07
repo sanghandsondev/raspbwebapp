@@ -54,12 +54,39 @@
         <h2>LED Control Panel</h2>
         <button class="button button-js">Toggle LED</button>
         <div class="status">
-            LED Status: OFF
+            Connection Status: Unkown<br>LED Status: UNKNOWN
         </div>
     </div>
     <script>
         // WebSocket connection
-        const ws = new WebSocket('ws://localhost:9000'); // Adjust the port to match your C++ daemon service
+        async function checkWebSocket(url) {
+            return new Promise((resolve) => {
+            try {
+                const testWs = new WebSocket(url);
+                testWs.onopen = () => {
+                testWs.close();
+                resolve(true);
+                };
+                testWs.onerror = () => {
+                resolve(false);
+                };
+            } catch {
+                resolve(false);
+            }
+            });
+        }
+
+        let wsUrl = 'ws://localhost:9000';
+        async () => {
+            if (await checkWebSocket('ws://192.168.1.50:9000')) {
+                wsUrl = 'ws://192.168.1.50:9000';
+            } else {
+                if (await checkWebSocket('ws://localhost:9000')) {
+                    wsUrl = 'ws://localhost:9000';
+                }
+            }
+        };
+        const ws = new WebSocket(wsUrl);
         const button = document.querySelector('.button-js');
         const statusElement = document.querySelector('.status');
         let isConnected = false;
@@ -68,14 +95,14 @@
         ws.addEventListener('open', (event) => {
             console.log('Connected to WebSocket server');
             isConnected = true;
-            statusElement.innerHTML = 'Connection Status: Connected<br>LED Status: OFF';
+            statusElement.innerHTML = 'Connection Status: Connected<br>LED Status: UNKNOWN';
         });
 
         // Connection closed
         ws.addEventListener('close', (event) => {
             console.log('Disconnected from WebSocket server');
             isConnected = false;
-            statusElement.innerHTML = 'Connection Status: Disconnected<br>LED Status: Unknown';
+            statusElement.innerHTML = 'Connection Status: Disconnected<br>LED Status: UNKNOWN';
             // Try to reconnect after 5 seconds
             setTimeout(() => {
                 location.reload();
@@ -83,37 +110,39 @@
         });
 
         // Listen for messages from the server
-        // ws.addEventListener('message', (event) => {
-        //     console.log('Message from server:', event.data);
-        //     try {
-        //         const data = JSON.parse(event.data);
-        //         if (data.type === 'status') {
-        //             statusElement.innerHTML = `Connection Status: Connected<br>LED Status: ${data.led ? 'ON' : 'OFF'}`;
-        //         }
-        //     } catch (e) {
-        //         console.error('Error parsing message:', e);
-        //     }
-        // });
+        ws.addEventListener('message', (event) => {
+            console.log('Message from server:', event.data);
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'initial_status') {
+                    statusElement.innerHTML = `Connection Status: Connected<br>LED Status: ${data.state.led ? 'ON' : 'OFF'}`;
+                } else if (data.type === 'update_status') {
+                    statusElement.innerHTML = `Connection Status: Connected<br>LED Status: ${data.value ? 'ON' : 'OFF'}`;
+                }
+            } catch (e) {
+                console.error('Error parsing message:', e);
+            }
+        });
 
         // Handle errors
-        // ws.addEventListener('error', (event) => {
-        //     console.error('WebSocket error:', event);
-        //     statusElement.innerHTML = 'Connection Status: Error<br>LED Status: Unknown';
-        // });
+        ws.addEventListener('error', (event) => {
+            console.error('WebSocket error:', event);
+            statusElement.innerHTML = 'Connection Status: Error<br>LED Status: OFF';
+        });
 
         // Button click handler
-        // button.addEventListener('click', () => {
-        //     if (!isConnected) {
-        //         alert('Not connected to the server');
-        //         return;
-        //     }
+        button.addEventListener('click', () => {
+            if (!isConnected) {
+                alert('Not connected to the server');
+                return;
+            }
 
-        //     // Send a toggle command to the server
-        //     const message = JSON.stringify({
-        //         command: 'toggle'
-        //     });
-        //     ws.send(message);
-        // });
+            // Send a toggle command to the server
+            const message = JSON.stringify({
+                command: 'toggle_led'
+            });
+            ws.send(message);
+        });
     </script>
 </body>
 </html>
