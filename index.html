@@ -40,12 +40,26 @@
             background-color: #45a049;
         }
 
+        .button.recording {
+            background-color: #ff4444;
+        }
+
+        .button.recording:hover {
+            background-color: #cc0000;
+        }
+
         .status {
             margin-top: 20px;
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 5px;
             background-color: #f8f8f8;
+        }
+
+        .record-status {
+            margin-top: 10px;
+            font-weight: bold;
+            color: #666;
         }
     </style>
 </head>
@@ -54,42 +68,28 @@
         <h2>LED Control Panel</h2>
         <button class="button button-js">Toggle LED</button>
         <div class="status">
-            Connection Status: Unkown<br>LED Status: UNKNOWN
+            Connection Status: Unknown<br>LED Status: UNKNOWN
+        </div>
+        <div class="record-container">
+            <h2>Voice Recording</h2>
+            <button class="button record-button">Start Recording</button>
+            <div class="record-status">Status: Not Recording</div>
         </div>
     </div>
     <script>
-        // WebSocket connection
-        async function checkWebSocket(url) {
-            return new Promise((resolve) => {
-            try {
-                const testWs = new WebSocket(url);
-                testWs.onopen = () => {
-                testWs.close();
-                resolve(true);
-                };
-                testWs.onerror = () => {
-                resolve(false);
-                };
-            } catch {
-                resolve(false);
-            }
-            });
-        }
-
-        let wsUrl = 'ws://localhost:9000';
-        async () => {
-            if (await checkWebSocket('ws://192.168.1.50:9000')) {
-                wsUrl = 'ws://192.168.1.50:9000';
-            } else {
-                if (await checkWebSocket('ws://localhost:9000')) {
-                    wsUrl = 'ws://localhost:9000';
-                }
-            }
-        };
+        
+        let wsUrl = 'ws://192.168.1.50:9000';
+        // let wsUrl = 'ws://localhost:9000';
+        console.log('Using WebSocket URL:', wsUrl);
         const ws = new WebSocket(wsUrl);
         const button = document.querySelector('.button-js');
         const statusElement = document.querySelector('.status');
         let isConnected = false;
+
+        // Recording functionality
+        const recordButton = document.querySelector('.record-button');
+        const recordStatus = document.querySelector('.record-status');
+        let isRecording = false;
 
         // Connection opened
         ws.addEventListener('open', (event) => {
@@ -104,9 +104,9 @@
             isConnected = false;
             statusElement.innerHTML = 'Connection Status: Disconnected<br>LED Status: UNKNOWN';
             // Try to reconnect after 5 seconds
-            setTimeout(() => {
-                location.reload();
-            }, 5000);
+            // setTimeout(() => {
+            //     location.reload();
+            // }, 5000);
         });
 
         // Listen for messages from the server
@@ -117,7 +117,18 @@
                 if (data.type === 'initial_status') {
                     statusElement.innerHTML = `Connection Status: Connected<br>LED Status: ${data.state.led ? 'ON' : 'OFF'}`;
                 } else if (data.type === 'update_status') {
-                    statusElement.innerHTML = `Connection Status: Connected<br>LED Status: ${data.value ? 'ON' : 'OFF'}`;
+                    switch(data.component) {
+                        case 'led':
+                            statusElement.innerHTML = `Connection Status: Connected<br>LED Status: ${data.value ? 'ON' : 'OFF'}`;
+                            break;
+                        case 'record':
+                            recordStatus.textContent = `Status: ${data.value === 'recording' ? 'Recording...' : 'Not Recording'}`;
+                            recordButton.classList.add('recording');
+                            isRecording = true;
+                            break;
+                        default:
+                            console.warn('Unknown component in update_status:', data.component);
+                    }
                 }
             } catch (e) {
                 console.error('Error parsing message:', e);
@@ -130,7 +141,7 @@
             statusElement.innerHTML = 'Connection Status: Error<br>LED Status: OFF';
         });
 
-        // Button click handler
+        // LED Button click handler
         button.addEventListener('click', () => {
             if (!isConnected) {
                 alert('Not connected to the server');
@@ -142,6 +153,33 @@
                 command: 'toggle_led'
             });
             ws.send(message);
+        });
+
+        
+
+        // Record button click handler
+        recordButton.addEventListener('click', () => {
+            if (!isConnected) {
+                alert('Not connected to the server');
+                return;
+            }
+            // Current status: No recording
+            if (!isRecording) {
+                // recordStatus.textContent = 'Status: Recording...';
+                // recordButton.classList.add('recording');
+                // isRecording = true;
+                // Send start recording signal to server
+
+                ws.send(JSON.stringify({ command: 'start_record' }));
+            } 
+            // Current status: Recording
+            else {
+                // recordStatus.textContent = 'Status: Not Recording';
+                // recordButton.classList.remove('recording');
+                // isRecording = false;
+                // Send stop recording signal to server
+                ws.send(JSON.stringify({ command: 'stop_record' }));
+            }
         });
     </script>
 </body>
