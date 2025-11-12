@@ -65,6 +65,9 @@ function setupWebSocket(wsUrl) {
                 switch(data.component) {
                     case 'led':
                         statusElement.innerHTML = `Connection Status: Connected<br>LED Status: ${data.value === 'on' ? 'ON' : 'OFF'}`;
+                        if (data.msg) {
+                            alert(data.msg);
+                        }
                         break;
                     case 'record':
                         recordStatus.textContent = `Status: ${data.value === 'recording' ? 'Recording...' : 'Not Recording'}`;
@@ -76,6 +79,9 @@ function setupWebSocket(wsUrl) {
                             recordButton.textContent = 'Start Recording';
                             recordButton.classList.remove('recording');
                             isRecording = false;
+                        }
+                        if (data.msg) {
+                            alert(data.msg);
                         }
                         break;
                     default:
