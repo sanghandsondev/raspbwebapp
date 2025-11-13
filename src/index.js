@@ -113,11 +113,13 @@ function setupWebSocket(wsUrl) {
                             recordButton.classList.add('recording');
                             isRecording = true;
                             startTimer();
-                        } else {
+                        } else if(data.value === 'stopped') {
                             recordButton.textContent = 'Start Recording';
                             recordButton.classList.remove('recording');
                             isRecording = false;
                             stopTimer();
+                        } else {
+                            console.warn('Unknown record status value:', data.value);
                         }
                         if (data.msg) {
                             alert(data.msg);
