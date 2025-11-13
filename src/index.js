@@ -4,11 +4,47 @@ const statusElement = document.querySelector('.status');
 
 const recordButton = document.querySelector('.record-button');
 const recordStatus = document.querySelector('.record-status');
+const recordTimer = document.querySelector('.record-timer');
 
 // State variables
 let ws;
 let isConnected = false;
 let isRecording = false;
+let timerInterval = null;
+let recordingStartTime = 0;
+const MAX_RECORD_TIME_S = 240; // 4 minutes
+
+function formatTime(seconds) {
+    const min = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const sec = (seconds % 60).toString().padStart(2, '0');
+    return `${min}:${sec}`;
+}
+
+function startTimer() {
+    recordingStartTime = Date.now();
+    if (timerInterval) clearInterval(timerInterval);
+
+    timerInterval = setInterval(() => {
+        const elapsedTime = Math.floor((Date.now() - recordingStartTime) / 1000);
+        
+        if (elapsedTime >= MAX_RECORD_TIME_S) {
+            recordTimer.textContent = `${formatTime(MAX_RECORD_TIME_S)} / 04:00`;
+            ws.send(JSON.stringify({ command: 'stop_record' }));
+            // The server response will trigger stopTimer() and UI updates
+        } else {
+            recordTimer.textContent = `${formatTime(elapsedTime)} / 04:00`;
+        }
+    }, 1000);
+    recordTimer.textContent = '00:00 / 04:00';
+}
+
+function stopTimer() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+    recordTimer.textContent = '00:00 / 04:00';
+}
 
 async function initializeWebSocket() {
     try {
@@ -60,6 +96,7 @@ function setupWebSocket(wsUrl) {
                     recordButton.textContent = 'Start Recording';
                     recordButton.classList.remove('recording');
                     isRecording = false;
+                    stopTimer();
                 }
             } else if (data.type === 'update_status') {
                 switch(data.component) {
@@ -75,10 +112,12 @@ function setupWebSocket(wsUrl) {
                             recordButton.textContent = 'Stop Recording';
                             recordButton.classList.add('recording');
                             isRecording = true;
+                            startTimer();
                         } else {
                             recordButton.textContent = 'Start Recording';
                             recordButton.classList.remove('recording');
                             isRecording = false;
+                            stopTimer();
                         }
                         if (data.msg) {
                             alert(data.msg);
